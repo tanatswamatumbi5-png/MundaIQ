@@ -1,0 +1,1 @@
+export { AddRecordScreen as default } from '@/features/eggs/AddRecordScreen';

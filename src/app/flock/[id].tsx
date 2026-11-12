@@ -1,0 +1,1 @@
+export { FlockDetailScreen as default } from '@/features/flocks/FlockDetailScreen';

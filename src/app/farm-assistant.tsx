@@ -1,0 +1,1 @@
+export { FarmAssistantScreen as default } from '@/features/assistant/FarmAssistantScreen';

@@ -1,0 +1,1 @@
+export { HatcheryScreen as default } from '@/features/hatchery/HatcheryScreen';

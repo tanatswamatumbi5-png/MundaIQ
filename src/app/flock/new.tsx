@@ -1,0 +1,1 @@
+export { AddFlockScreen as default } from '@/features/flocks/AddFlockScreen';
