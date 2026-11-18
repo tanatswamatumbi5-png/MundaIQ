@@ -43,18 +43,19 @@ certain it is unmodified.
 
 ## Build from source
 
-Requires Node.js, an Expo account, and EAS CLI.
+Requires Node.js, JDK 17, and the Android SDK (platform 36, build-tools 36). No Expo account is
+needed.
 
 ```powershell
 npm.cmd install
-npx.cmd eas-cli@latest login
-npx.cmd eas-cli@latest init
-npx.cmd eas-cli@latest build --platform android --profile direct
+npm.cmd run build:android
 ```
 
-The `direct` profile produces a signed APK for GitHub Releases. See
-[`docs/github-releases.md`](docs/github-releases.md) for the full release walkthrough, including
-keystore backup and versioning.
+The build regenerates the native project, signs it with your release key, and writes
+`release/MundaIQ-<version>.apk` plus a `.sha256` file. Android release signing is read from Gradle
+properties in `~/.gradle/gradle.properties` — see
+[`docs/github-releases.md`](docs/github-releases.md) for the keystore setup, versioning, and the full
+release walkthrough.
 
 ## Docs
 

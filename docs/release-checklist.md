@@ -7,8 +7,8 @@ The default track is GitHub Releases + Obtainium — see `docs/github-releases.m
 walkthrough. Sections 1–2 below apply to both tracks; sections 3–7 are the optional Google Play
 track.
 
-This checklist assumes the app is built with Expo SDK 57 + EAS Build. On this Windows machine the
-PowerShell shim for npm is blocked by execution policy, so use `npm.cmd` and `npx.cmd`.
+This checklist assumes the app is built locally with Expo SDK 57 + Gradle. On this Windows machine
+the PowerShell shim for npm is blocked by execution policy, so use `npm.cmd` and `npx.cmd`.
 
 ---
 
@@ -16,10 +16,10 @@ PowerShell shim for npm is blocked by execution policy, so use `npm.cmd` and `np
 
 - [ ] Confirm the app package name: `com.mundaiq.app`. **It cannot be changed after the first
   release.**
-- [ ] Install Git for Windows and put this project under version control before the first release.
-  (Git is not installed on the current machine — see `docs/github-releases.md`.)
+- [ ] Confirm Git for Windows, JDK 17 and the Android SDK are installed. (All three are present on
+  the current machine — see `docs/github-releases.md`.)
 - [ ] Make a backup of the project folder.
-- [ ] Create a free Expo account (needed for EAS Build on both tracks).
+- [ ] Confirm the release keystore exists and is backed up (see below). No Expo account is needed.
 - [ ] Replace the remaining `[YOUR ...]` placeholders (support email, privacy-policy URL, developer
   name) in `README.md` and `docs/`.
 
@@ -39,14 +39,7 @@ PowerShell shim for npm is blocked by execution policy, so use `npm.cmd` and `np
 ```powershell
 cd "C:\Users\ADMIN\Documents\Default Project\munda-iq"
 
-# 1. Create a free Expo account, then log in.
-npx.cmd eas-cli@latest login
-
-# 2. Link this project to an EAS project.
-#    This adds extra.eas.projectId to app.json and creates the project on expo.dev.
-npx.cmd eas-cli@latest init
-
-# 3. Check the resolved Android config.
+# 1. Check the resolved Android config.
 npx.cmd expo config --type public
 ```
 
@@ -58,25 +51,25 @@ Confirm in the resolved config:
 - `android.allowBackup` is `false`
 - Splash screen and adaptive icon paths exist
 
-EAS manages the Android upload keystore. Back it up after the first build:
-
-```powershell
-npx.cmd eas-cli@latest credentials --platform android
-```
-
-Choose **Download existing keystore**. Store it and its passwords somewhere safe (password manager,
-encrypted drive). On the direct-APK track a lost key means users must uninstall and reinstall (losing
-local data unless they exported a backup). On Play, Google Play App Signing can help with a reset,
-but it is slow and risky.
+The Android release keystore lives outside the repository at
+`C:\Users\ADMIN\mundaiq-signing\mundaiq-release.jks`, and Gradle reads its path and passwords from
+`C:\Users\ADMIN\.gradle\gradle.properties`. Store the keystore and passwords in a password manager
+and on an encrypted drive. On the direct-APK track a lost key means users must uninstall and
+reinstall (losing local data unless they exported a backup). On Play, Google Play App Signing can
+help with a reset, but it is slow and risky.
 
 ## 2. Build an APK and test on a real phone
 
 ```powershell
-# Direct-APK track (GitHub Releases):
-npx.cmd eas-cli@latest build --platform android --profile direct
+# Regenerates android/, applies release signing, builds a signed APK.
+npm.cmd run build:android
+```
 
-# Or the preview profile, which is equivalent for testing:
-npx.cmd eas-cli@latest build --platform android --profile preview
+The APK is copied to `release/MundaIQ-<version>.apk` with a `.sha256` file beside it. To rebuild
+without re-running `expo prebuild`:
+
+```powershell
+node scripts/build-android-release.mjs --skip-prebuild
 ```
 
 Install the resulting APK on an Android phone (Android 10 or newer recommended) and run this test
@@ -160,17 +153,18 @@ Then complete **Dashboard → Set up your app**:
 
 Google Play requires new apps and updates to target recent Android versions. For the 2026 cycle,
 new apps must target **Android 16 (API level 36)** from **31 August 2026**. Expo SDK 57 targets API
-36; verify it in the EAS build output or with:
+36; verify it in the build output with:
 
 ```powershell
-# After downloading the AAB/APK build artifact
-aapt dump badging app-release.apk | findstr targetSdkVersion
+$aapt = "$env:LOCALAPPDATA\Android\Sdk\build-tools\36.0.0\aapt.exe"
+& $aapt dump badging .\release\MundaIQ-1.0.0.apk | Select-String targetSdkVersion
 ```
 
 Also confirm:
 
-- [ ] 64-bit native libraries are included (EAS release builds are arm64-v8a + armeabi-v7a).
-- [ ] `versionCode` increases for every upload. `eas.json` uses `autoIncrement` for production.
+- [ ] 64-bit native libraries are included (`reactNativeArchitectures` in `android/gradle.properties`
+  includes `arm64-v8a`).
+- [ ] `versionCode` increases for every upload. Bump `expo.android.versionCode` by hand.
 - [ ] The app launches without Google Play services dependencies that would break on budget phones.
 - [ ] No unused sensitive permissions are declared in the merged manifest.
 
@@ -195,15 +189,21 @@ testing before production.
 ## 6. Production build and upload
 
 ```powershell
-# Build an Android App Bundle (.aab) for Play.
-npx.cmd eas-cli@latest build --platform android --profile production
+# Play needs an Android App Bundle (.aab) instead of an APK.
+cd android
+.\gradlew.bat bundleRelease
+cd ..
 ```
 
-Then either upload the `.aab` manually in **Play Console → Production → Create new release**, or use
-EAS Submit with a Google Cloud service account that has Play Developer API access:
+The bundle is written to `android/app/build/outputs/bundle/release/app-release.aab` and is signed with
+the same release key (the build script patches `android/app/build.gradle`; run
+`npm.cmd run build:android` once first if `android/` does not exist yet).
+
+Then upload the `.aab` manually in **Play Console → Production → Create new release**. EAS Submit can
+also upload it, but it needs a Google Cloud service account with Play Developer API access:
 
 ```powershell
-npx.cmd eas-cli@latest submit --platform android --profile production
+npx.cmd eas-cli@latest submit --platform android --path .\android\app\build\outputs\bundle\release\app-release.aab
 ```
 
 Release notes (example):
@@ -229,7 +229,7 @@ First release of MundaIQ.
 
 ## 8. After release
 
-- [ ] Back up the EAS keystore and Play Console owner account recovery codes.
+- [ ] Back up the release keystore and Play Console owner account recovery codes.
 - [ ] Record the release `versionCode`, commit hash and build date.
 - [ ] Monitor Play Console **Android vitals** and user reviews weekly.
 - [ ] Update the privacy policy and Data safety form before shipping any build that adds network
