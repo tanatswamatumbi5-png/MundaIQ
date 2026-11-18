@@ -113,7 +113,12 @@ if (!skipPrebuild) {
 }
 
 patchGradleSigning();
-run('gradlew.bat assembleRelease --no-daemon', androidDir);
+// This machine has 2 CPU cores / 7.7 GB RAM. A single 64-bit ABI with serial
+// Gradle workers keeps clang from exhausting memory during native builds.
+run(
+  'gradlew.bat assembleRelease --no-daemon --no-parallel --max-workers=1 -PreactNativeArchitectures=arm64-v8a',
+  androidDir,
+);
 
 const builtApk = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 if (!existsSync(builtApk)) fail(`Build finished but no APK was found at ${builtApk}`);
